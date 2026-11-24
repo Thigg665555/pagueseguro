@@ -1,7 +1,10 @@
 'use strict';
 
 // Gerador público de PIX avulso via TriboPay.
-// Não coleta nem envia nome, CPF, telefone ou e-mail do pagador.
+// O pagador não informa nada no site. O campo "customer" exigido pela TriboPay
+// é preenchido no servidor com os dados REAIS do recebedor (titular da conta),
+// lidos de variáveis de ambiente do Netlify. Esses dados nunca vão para o
+// navegador, nem na resposta da função, nem nos logs.
 
 const API_BASE = 'https://api.tribopay.com.br/api/public/v1';
 const REQUEST_TIMEOUT_MS = 25000;
@@ -156,6 +159,70 @@ function requiredTriboPayConfig() {
   return { apiToken, offerHash, productHash, missing };
 }
 
+// ---------------------------------------------------------------------------
+// Dados do recebedor (customer) vindos do ambiente do servidor.
+// Variáveis no Netlify (Site settings > Environment variables):
+//   PIX_MANUAL_CUSTOMER_NAME      nome completo do titular da conta
+//   PIX_MANUAL_CUSTOMER_DOCUMENT  CPF ou CNPJ do titular (com ou sem pontuação)
+//   PIX_MANUAL_CUSTOMER_EMAIL     e-mail do titular
+//   PIX_MANUAL_CUSTOMER_PHONE     telefone com DDD (com ou sem pontuação/+55)
+// ---------------------------------------------------------------------------
+
+function isValidCpf(cpf) {
+  if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
+  for (let t = 9; t < 11; t++) {
+    let sum = 0;
+    for (let i = 0; i < t; i++) sum += Number(cpf[i]) * (t + 1 - i);
+    if (((sum * 10) % 11) % 10 !== Number(cpf[t])) return false;
+  }
+  return true;
+}
+
+function normalizeDocument(value) {
+  const cleaned = String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (cleaned.length === 11 && isValidCpf(cleaned)) return cleaned;
+  // CNPJ (14 posições; aceita o formato alfanumérico novo, sem conferir dígitos).
+  if (cleaned.length === 14 && /^[A-Z0-9]{12}\d{2}$/.test(cleaned)) return cleaned;
+  return '';
+}
+
+function normalizePhone(value) {
+  let digits = String(value || '').replace(/\D/g, '');
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith('55')) digits = digits.slice(2);
+  return /^\d{10,11}$/.test(digits) ? digits : '';
+}
+
+function normalizeEmail(value) {
+  const email = String(value || '').trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 120 ? email : '';
+}
+
+function normalizeName(value) {
+  const name = cleanText(String(value || ''), 120).replace(/\s+/g, ' ');
+  return name.length >= 3 ? name : '';
+}
+
+// Retorna { customer } quando tudo está correto ou { problems: [...] } com os
+// NOMES das variáveis com falha (nunca os valores).
+function getCustomerFromEnv() {
+  const fields = [
+    ['PIX_MANUAL_CUSTOMER_NAME', 'name', normalizeName],
+    ['PIX_MANUAL_CUSTOMER_DOCUMENT', 'document', normalizeDocument],
+    ['PIX_MANUAL_CUSTOMER_EMAIL', 'email', normalizeEmail],
+    ['PIX_MANUAL_CUSTOMER_PHONE', 'phone_number', normalizePhone]
+  ];
+  const customer = {};
+  const problems = [];
+  for (const [envName, key, normalize] of fields) {
+    const raw = process.env[envName];
+    if (!raw) { problems.push(`${envName} (ausente)`); continue; }
+    const value = normalize(raw);
+    if (!value) { problems.push(`${envName} (formato inválido)`); continue; }
+    customer[key] = value;
+  }
+  return problems.length ? { problems } : { customer };
+}
+
 async function createPix(event) {
   if (event.httpMethod !== 'POST') return jsonResponse(405, { error: 'Método não permitido.' });
   if (!allowRequest(event)) return jsonResponse(429, { error: 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.' });
@@ -163,6 +230,12 @@ async function createPix(event) {
   const config = requiredTriboPayConfig();
   if (config.missing.length) {
     return jsonResponse(500, { error: `Faltam variáveis no Netlify: ${config.missing.join(', ')}.` });
+  }
+
+  const customerResult = getCustomerFromEnv();
+  if (customerResult.problems) {
+    console.error('[PIX avulso] Variáveis do recebedor com problema:', customerResult.problems);
+    return jsonResponse(500, { error: `Configure no Netlify: ${customerResult.problems.join(', ')}.` });
   }
 
   let body;
@@ -183,11 +256,13 @@ async function createPix(event) {
   const description = cleanText(body.description, 80) || 'Pagamento avulso';
   const reference = `AVULSO-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
-  // Importante: customer foi deliberadamente omitido. Nenhum dado pessoal é solicitado/enviado pelo site.
+  // O customer é montado só aqui no servidor, com os dados reais do recebedor.
+  // Ele não aparece na tela, na resposta da função nem nos logs.
   const payload = {
     amount: amountCents,
     offer_hash: config.offerHash,
     payment_method: 'pix',
+    customer: customerResult.customer,
     cart: [{
       product_hash: config.productHash,
       title: description,
@@ -212,14 +287,14 @@ async function createPix(event) {
       console.error('[PIX avulso] TriboPay rejeitou a criação:', {
         httpStatus: response.status,
         responseKeys: data && typeof data === 'object' ? Object.keys(data) : [],
+        providerMessage: message,
         reference
       });
-      const customerRequired = /customer|cliente|pagador|document|cpf|email|phone|telefone|nome/i.test(message);
+      const customerRejected = /customer|cliente|pagador|document|cpf|cnpj|email|phone|telefone|nome/i.test(message);
       return jsonResponse(502, {
-        error: customerRequired
-          ? 'A TriboPay recusou a cobrança sem dados do pagador. A API da sua conta parece exigir cadastro do cliente. Não enviamos dados fictícios. Será necessário confirmar com o suporte da TriboPay se existe uma modalidade de cobrança PIX sem identificação.'
+        error: customerRejected
+          ? 'A TriboPay recusou os dados de identificação configurados no servidor. Confira as variáveis PIX_MANUAL_CUSTOMER_* no Netlify e os logs da função.'
           : message,
-        provider_message: message,
         reference
       });
     }
