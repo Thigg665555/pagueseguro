@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="theme-color" content="#111111">
+  <title>Pagamento via PIX</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+  <style>
+    :root{color-scheme:dark;--bg:#101112;--panel:#1b1d1f;--panel2:#24272a;--line:#34383c;--accent:#d9ad54;--accent2:#f0cf86;--text:#f5f5f4;--muted:#a6a8aa;--green:#1a9b67;--red:#d84b54}
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:radial-gradient(ellipse at top,#252321 0,#111213 48%,#0b0c0d 100%);color:var(--text);font-family:Inter,Arial,sans-serif}
+    body{padding:28px 14px 42px}
+    .wrap{width:100%;max-width:470px;margin:0 auto}
+    .top{text-align:center;margin:8px 0 22px}
+    .mark{width:54px;height:54px;margin:0 auto 14px;border:1px solid #5a4a2c;border-radius:17px;display:grid;place-items:center;background:linear-gradient(145deg,#30291e,#171717);color:var(--accent2);font-size:25px;box-shadow:0 9px 25px #0007}
+    h1{font-size:clamp(23px,5vw,30px);line-height:1.15;margin:0 0 8px;font-weight:800;letter-spacing:-.045em}
+    .subtitle{margin:0;color:var(--muted);font-size:13px;line-height:1.55}
+    .card{background:linear-gradient(145deg,rgba(34,36,38,.98),rgba(23,24,25,.98));border:1px solid #37393b;border-radius:20px;padding:22px;box-shadow:0 18px 50px #0006}
+    .trust{display:flex;align-items:center;justify-content:center;gap:8px;color:#c8ba9b;font-size:11px;margin:0 0 20px}
+    .trust svg{flex:0 0 auto}
+    .field{margin:0 0 15px}
+    label{display:block;margin:0 0 8px;font-size:12px;font-weight:700;color:#e4e4e2}
+    input{width:100%;height:50px;border:1px solid #45484a;border-radius:12px;background:#111314;color:#fff;padding:0 14px;font:600 15px Inter,Arial,sans-serif;outline:none;transition:border-color .15s,box-shadow .15s}
+    input::placeholder{color:#777b7e}
+    input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #d9ad5422}
+    .amount-input{height:64px;font-size:27px;font-weight:800;letter-spacing:.01em}
+    .hint{margin:7px 0 0;color:#898d90;font-size:10px;line-height:1.45}
+    .btn{width:100%;min-height:51px;border:0;border-radius:12px;background:linear-gradient(135deg,#f0cc7d,#c9963d);color:#1b160c;font:800 14px Inter,Arial,sans-serif;cursor:pointer;box-shadow:0 8px 20px #b8873028;transition:transform .15s,filter .15s}
+    .btn:hover{filter:brightness(1.06);transform:translateY(-1px)}
+    .btn:disabled{opacity:.62;cursor:wait;transform:none}
+    .btn-secondary{background:#303437;color:#eee;box-shadow:none;border:1px solid #464a4d}
+    .message{display:none;margin:0 0 14px;border-radius:10px;padding:11px 12px;font-size:12px;line-height:1.5}
+    .message.error{display:block;background:#3d2022;border:1px solid #71383d;color:#ffd0d2}
+    .message.info{display:block;background:#202d35;border:1px solid #354d5b;color:#cdeaff}
+    .hidden{display:none!important}
+    .result{margin-top:18px;padding:18px;border:1px solid #3d4144;border-radius:16px;background:#131516;text-align:center}
+    .status{display:inline-flex;align-items:center;gap:7px;background:#173829;color:#a9efc9;border:1px solid #285941;border-radius:30px;padding:6px 10px;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+    .result-amount{font-size:29px;font-weight:800;margin:13px 0 3px;color:#fff}
+    .result-caption{font-size:11px;color:var(--muted)}
+    #qr-frame{width:220px;height:220px;margin:17px auto 14px;padding:10px;background:#fff;border-radius:13px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    #qr-frame img{display:block;max-width:100%;max-height:100%;object-fit:contain}
+    #qrcode canvas,#qrcode img{max-width:100%;height:auto}
+    .copy-label{text-align:left;color:#d8d8d5;font-size:11px;font-weight:700;margin:8px 0}
+    .pix-code{width:100%;min-height:82px;resize:none;border:1px solid #414648;border-radius:10px;background:#0d0f10;color:#dfe2e2;padding:10px;font:11px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere}
+    .copy-btn{margin-top:9px;min-height:45px;background:var(--green);color:#fff;box-shadow:none}
+    .meta{margin:12px 0 0;color:#919698;font-size:10px;line-height:1.5;overflow-wrap:anywhere}
+    .actions{display:grid;grid-template-columns:1fr;gap:8px;margin-top:12px}
+    .actions .btn{min-height:43px;font-size:12px}
+    .foot{text-align:center;color:#777d80;font-size:10px;line-height:1.55;margin:16px 5px 0}
+    .loader{display:inline-block;width:14px;height:14px;border:2px solid #20190d55;border-top-color:#20190d;border-radius:50%;vertical-align:-2px;margin-right:8px;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @media(max-width:390px){body{padding:18px 11px 30px}.card{padding:18px}.result{padding:14px}#qr-frame{width:205px;height:205px}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <div class="mark" aria-hidden="true">＄</div>
+      <h1>Pagamento via PIX</h1>
+      <p class="subtitle">Informe o valor desejado e gere seu PIX para pagamento.</p>
+    </header>
+
+    <section class="card">
+      <div class="trust">
+        <svg width="15" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2 4 5v6c0 5.2 3.4 9.3 8 11 4.6-1.7 8-5.8 8-11V5l-8-3Z" stroke="#d9ad54" stroke-width="1.7"/><path d="m9 12 2 2 4-4" stroke="#d9ad54" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Pagamento processado pela TriboPay
+      </div>
+
+      <form id="pix-form" novalidate>
+        <div class="field">
+          <label for="amount">Valor que deseja pagar</label>
+          <input class="amount-input" id="amount" name="amount" type="text" inputmode="decimal" autocomplete="off" placeholder="R$ 0,00" required>
+          <p class="hint">Valor mínimo: R$ 5,00 • Valor máximo: R$ 10.000,00</p>
+        </div>
+        <div class="field">
+          <label for="description">Identificação (opcional)</label>
+          <input id="description" name="description" type="text" maxlength="80" placeholder="Ex.: Pagamento de serviço">
+        </div>
+        <div class="message" id="pix-message" role="alert" aria-live="polite"></div>
+        <button class="btn" id="generate-button" type="submit">Gerar PIX e QR Code</button>
+      </form>
+
+      <section id="result" class="result hidden" aria-live="polite">
+        <span class="status">● PIX criado • aguardando pagamento</span>
+        <div class="result-amount" id="result-amount">R$ 0,00</div>
+        <div class="result-caption">Abra o aplicativo do seu banco e escaneie o QR Code</div>
+        <div id="qr-frame"><div id="qrcode"></div><img id="qr-image" class="hidden" alt="QR Code PIX"></div>
+        <div class="copy-label">PIX copia e cola</div>
+        <textarea class="pix-code" id="pix-code" readonly aria-label="Código PIX copia e cola"></textarea>
+        <button class="btn copy-btn" id="copy-button" type="button">Copiar código PIX</button>
+        <div class="meta" id="transaction-meta"></div>
+        <div class="actions">
+          <button class="btn btn-secondary" id="new-button" type="button">Gerar outro PIX</button>
+        </div>
+      </section>
+    </section>
+
+    <p class="foot">Não solicitamos nome, CPF, telefone ou e-mail. Confira o valor e o nome do recebedor exibido pelo seu banco antes de confirmar o pagamento.</p>
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+      const API = '/.netlify/functions/pix-manual';
+      const MIN_CENTS = 500;
+      const MAX_CENTS = 1000000;
+      const $ = id => document.getElementById(id);
+      let lastTransactionId = '';
+      let qrPromise = null;
+
+      function showMessage(message, type = 'error') {
+        const el = $('pix-message');
+        el.textContent = message;
+        el.className = 'message ' + type;
+      }
+      function clearMessage() {
+        $('pix-message').textContent = '';
+        $('pix-message').className = 'message';
+      }
+      function parseAmount(value) {
+        let raw = String(value || '').trim().replace(/^R\$\s*/i, '').replace(/\s/g, '');
+        if (!raw) return null;
+        if (raw.includes(',')) {
+          if (!/^\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?$/.test(raw) && !/^\d+(?:,\d{1,2})?$/.test(raw)) return null;
+          raw = raw.replace(/\./g, '').replace(',', '.');
+        } else if (raw.includes('.')) {
+          if (!/^\d+\.\d{1,2}$/.test(raw)) return null;
+        } else if (!/^\d+$/.test(raw)) return null;
+        const [whole, fraction = ''] = raw.split('.');
+        const cents = Number(whole) * 100 + Number((fraction + '00').slice(0, 2));
+        return Number.isSafeInteger(cents) ? cents : null;
+      }
+      function formatBRL(cents) {
+        return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      }
+      function setBusy(busy) {
+        const button = $('generate-button');
+        button.disabled = busy;
+        button.innerHTML = busy ? '<span class="loader"></span>Gerando cobrança...' : 'Gerar PIX e QR Code';
+      }
+      async function ensureQrLibrary() {
+        if (window.QRCode) return;
+        if (!qrPromise) {
+          qrPromise = new Promise((resolve, reject) => {
+            const existing = document.querySelector('script[data-qr-library]');
+            if (existing) {
+              existing.addEventListener('load', resolve, { once: true });
+              existing.addEventListener('error', reject, { once: true });
+              return;
+            }
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+            script.async = true;
+            script.dataset.qrLibrary = '1';
+            script.onload = resolve;
+            script.onerror = () => reject(new Error('Não foi possível carregar o gerador visual do QR Code. Copie o código PIX para pagar.'));
+            document.head.appendChild(script);
+          });
+        }
+        await qrPromise;
+      }
+      async function renderQr(data) {
+        const image = $('qr-image');
+        const mount = $('qrcode');
+        mount.innerHTML = '';
+        image.classList.add('hidden');
+        image.removeAttribute('src');
+        if (data.qr_code_base64) {
+          image.src = data.qr_code_base64;
+          image.classList.remove('hidden');
+          image.onerror = async () => {
+            image.classList.add('hidden');
+            await ensureQrLibrary();
+            new QRCode(mount, { text: data.qr_code, width: 200, height: 200, colorDark: '#111111', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+          };
+          return;
+        }
+        await ensureQrLibrary();
+        new QRCode(mount, { text: data.qr_code, width: 200, height: 200, colorDark: '#111111', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+      }
+      async function createPix(payload) {
+        const response = await fetch(API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(payload),
+          cache: 'no-store'
+        });
+        let data = {};
+        try { data = await response.json(); } catch (_) {}
+        if (!response.ok) throw new Error(data.error || 'Não foi possível gerar o PIX.');
+        return data;
+      }
+
+      $('pix-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        clearMessage();
+        $('result').classList.add('hidden');
+        const amountCents = parseAmount($('amount').value);
+        if (!amountCents || amountCents < MIN_CENTS || amountCents > MAX_CENTS) {
+          showMessage('Informe um valor entre R$ 5,00 e R$ 10.000,00.');
+          $('amount').focus();
+          return;
+        }
+        setBusy(true);
+        try {
+          const data = await createPix({
+            amount: $('amount').value,
+            description: $('description').value.trim()
+          });
+          if (!data.qr_code || !data.transaction_id) throw new Error('A TriboPay não retornou o código PIX completo. Confira as transações no painel antes de tentar novamente.');
+          lastTransactionId = data.transaction_id;
+          $('result-amount').textContent = formatBRL(data.amount_cents || amountCents);
+          $('pix-code').value = data.qr_code;
+          const expiration = data.expires_at ? ' • Expira: ' + data.expires_at : '';
+          $('transaction-meta').textContent = 'ID da transação: ' + data.transaction_id + expiration;
+          $('result').classList.remove('hidden');
+          try { await renderQr(data); }
+          catch (qrError) { showMessage(qrError.message, 'info'); }
+          $('result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } catch (error) {
+          showMessage(error.message || 'Não foi possível gerar o PIX.');
+        } finally {
+          setBusy(false);
+        }
+      });
+
+      $('copy-button').addEventListener('click', async () => {
+        const value = $('pix-code').value;
+        try { await navigator.clipboard.writeText(value); }
+        catch (_) { $('pix-code').focus(); $('pix-code').select(); document.execCommand('copy'); }
+        $('copy-button').textContent = 'Código copiado!';
+        setTimeout(() => { $('copy-button').textContent = 'Copiar código PIX'; }, 1800);
+      });
+
+      $('new-button').addEventListener('click', () => {
+        $('result').classList.add('hidden');
+        clearMessage();
+        $('amount').value = '';
+        $('description').value = '';
+        $('amount').focus();
+        lastTransactionId = '';
+      });
+
+      $('amount').addEventListener('blur', () => {
+        const cents = parseAmount($('amount').value);
+        if (cents !== null) $('amount').value = (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      });
+    })();
+  </script>
+</body>
+</html>
